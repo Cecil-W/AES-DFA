@@ -89,48 +89,76 @@ def perform_dfa(correct_ciphertexts, faulty_ciphertexts):
     c = np.array(correct_ciphertexts, dtype=np.uint8)
     f = np.array(faulty_ciphertexts, dtype=np.uint8)
     
-    
-    candidates = []
+    # choose a list of lists for debugging purposes, so it can hold multiple solutions for each byte
+    solutions = []
     for _ in range(16):
-        candidates.append([])
+        solutions.append([])
 
     # finding canditates for the first column
-    for k13 in range(256): 
-        a_13 = a_i(c[0, 13], k13, f[0, 13])
-        for k10 in range(256):
-            a_10 = a_i(c[0, 10], k10, f[0, 10])
-            if a_13 != a_10: # if they dont satisfy the equation skip this k10
-                continue
-            # now we can check with the second faulty pair
-            a_13_second = a_i(c[1, 13], k13, f[1, 13])
-            a_10_second = a_i(c[1, 10], k10, f[1, 10])
-            if a_13_second != a_10_second:
-                continue
-            # now we add the equation for a_0
-            for k0 in range(256):
-                a_0 = a_i(c[0, 0], k0, f[0, 0])
-                a_0_second = a_i(c[1, 0], k0, f[1, 0])
-                if (a_0 != gfmul256(a_13, 2)) or (a_0_second != gfmul256(a_13_second, 2)):
-                    continue
-                for k7 in range(256):
-                    a_3 = a_i(c[0, 7], k7, f[0, 7])
-                    a_3_second = a_i(c[1, 7], k7, f[1, 7])
-                    if (a_3 != gfmul256(a_13, 3)) or (a_3_second != gfmul256(a_13_second, 3)):
-                        continue
-                    candidates[0].append(k0)
-                    candidates[7].append(k7)
-                    candidates[10].append(k10)
-                    candidates[13].append(k13)
+    solve_column(c, f, solutions, 10, 13, 0, 7)
+    # second column 
+    solve_column(c, f, solutions, 1, 4, 11, 14)
+    # third column
+    solve_column(c, f, solutions, 8, 15, 2, 5)
+    # fourth column
+    solve_column(c, f, solutions, 3, 6, 9, 12)
           
-    
-    
+    for index, value in enumerate(solutions): 
+        key[index] = value[0] # let hope we only got 1 solution in the list
         
 
     return key
 
+def solve_column(c, f, sol, index_0, index_1, index_2, index_3):
+    """ 
+    c = list of correct cipher texts for two pair   \n
+    f = list of faulty cipher texts for two pair    \n
+    sol = 2d list in which the solution gets saved  \n
+
+    ### index_i ###
+    index of the byte in the roundkey, take care entry in the state gets multiplied by 2 or 3 and assign them to index 2 and 3\n
+    example: 
+    ```
+    a_i(index_0) = a_i(index_1)     
+    a_i(index_0) = a_i(index_1)     
+    a_i(index_2) = 2 * a_i(index_0)  
+    a_i(index_3) = 3 * a_i(index_0) 
+    ```
+    """
+    # 'ki' are the hypotheses for key byte with index_i
+    for k0 in range(256): 
+        a_0 = a_i(c[0, index_0], k0, f[0, index_0])
+        for k1 in range(256):
+            a_1 = a_i(c[0, index_1], k1, f[0, index_1])
+            if a_0 != a_1: # if a byte pair doesnt satisfy the equation we skip this k1
+                continue
+            # now we can check with the second faulty pair
+            a_0_second = a_i(c[1, index_0], k0, f[1, index_0])
+            a_1_second = a_i(c[1, index_1], k1, f[1, index_1])
+            if a_0_second != a_1_second:
+                continue
+            # now we add the equation for the a_i that is worth 2 F_i
+            for k2 in range(256):
+                a_2 = a_i(c[0, index_2], k2, f[0, index_2])
+                a_2_second = a_i(c[1, index_2], k2, f[1, index_2])
+                if (a_2 != gfmul256(a_0, 2)) or (a_2_second != gfmul256(a_0_second, 2)):
+                    continue
+                # now for the equation which contains the * 3 
+                for k3 in range(256):
+                    a_3 = a_i(c[0, index_3], k3, f[0, index_3])
+                    a_3_second = a_i(c[1, index_3], k3, f[1, index_3])
+                    if (a_3 != gfmul256(a_0, 3)) or (a_3_second != gfmul256(a_0_second, 3)):
+                        continue
+                    # seems like these hypotheses passed all the continues so we can save them
+                    # hopefully they are the only ones
+                    sol[index_0].append(k0)
+                    sol[index_1].append(k1)
+                    sol[index_2].append(k2)
+                    sol[index_3].append(k3)
+
 def a_i(c_i, k, f_i):
     """
-    calculates a with SR applied for a byte 
+    calculates 'a' with SR applied for a byte 'k'
     c_i: cipher text byte i
     k: key byte i
     f_i: faulty cipher text byte i 
