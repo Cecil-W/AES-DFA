@@ -60,9 +60,9 @@ def gfmul256(a, b):
             p ^= a
         a <<= 1
         if a & 0x100:
-            a ^= 0x1b
+            a ^= 0x1B
         b >>= 1
-    return p & 0xff
+    return p & 0xFF
 
 
 def mixColumn(in_column):
@@ -73,22 +73,25 @@ def mixColumn(in_column):
     """
     v0, v1, v2, v3 = in_column
 
-    out_column = [gfmul256(v0, 2) ^ gfmul256(v1, 3) ^ v2 ^ v3,
-                  v0 ^ gfmul256(v1, 2) ^ gfmul256(v2, 3) ^ v3,
-                  v0 ^ v1 ^ gfmul256(v2, 2) ^ gfmul256(v3, 3),
-                  gfmul256(v0, 3) ^ v1 ^ v2 ^ gfmul256(v3, 2)]
+    out_column = [
+        gfmul256(v0, 2) ^ gfmul256(v1, 3) ^ v2 ^ v3,
+        v0 ^ gfmul256(v1, 2) ^ gfmul256(v2, 3) ^ v3,
+        v0 ^ v1 ^ gfmul256(v2, 2) ^ gfmul256(v3, 3),
+        gfmul256(v0, 3) ^ v1 ^ v2 ^ gfmul256(v3, 2),
+    ]
 
     return out_column
 
 
 ####################### IMPLEMENT YOUR DFA ATTACK BELOW  #######################
 
+
 def perform_dfa(correct_ciphertexts, faulty_ciphertexts):
     key = np.zeros(16, dtype=np.uint8)
     # ...
     c = np.array(correct_ciphertexts, dtype=np.uint8)
     f = np.array(faulty_ciphertexts, dtype=np.uint8)
-    
+
     # choose a list of lists for debugging purposes, so it can hold multiple solutions for each byte
     solutions = []
     for _ in range(16):
@@ -96,41 +99,43 @@ def perform_dfa(correct_ciphertexts, faulty_ciphertexts):
 
     # finding canditates for the first column
     solve_column(c, f, solutions, 10, 13, 0, 7)
-    # second column 
+    # second column
     solve_column(c, f, solutions, 1, 4, 11, 14)
     # third column
     solve_column(c, f, solutions, 8, 15, 2, 5)
     # fourth column
     solve_column(c, f, solutions, 3, 6, 9, 12)
-          
-    for index, value in enumerate(solutions): 
-        key[index] = value[0] # let hope we only got 1 solution in the list
-        
+
+    for index, value in enumerate(solutions):
+        key[index] = value[0]  # let's hope we only got 1 solution in the list
 
     return key
 
+
 def solve_column(c, f, sol, index_0, index_1, index_2, index_3):
-    """ 
+    """
     c = list of correct cipher texts for two pair   \n
     f = list of faulty cipher texts for two pair    \n
     sol = 2d list in which the solution gets saved  \n
 
     ### index_i ###
-    index of the byte in the roundkey, take care entry in the state gets multiplied by 2 or 3 and assign them to index 2 and 3\n
-    example: 
+    index of the byte in the roundkey, take care entry in the state gets multiplied by 2 or 3
+    and assign them to index 2 and 3
+    
+    example:
     ```
-    a_i(index_0) = a_i(index_1)     
-    a_i(index_0) = a_i(index_1)     
-    a_i(index_2) = 2 * a_i(index_0)  
-    a_i(index_3) = 3 * a_i(index_0) 
+    a_i(index_0) = a_i(index_1)
+    a_i(index_0) = a_i(index_1)
+    a_i(index_2) = 2 * a_i(index_0)
+    a_i(index_3) = 3 * a_i(index_0)
     ```
     """
     # 'ki' are the hypotheses for key byte with index_i
-    for k0 in range(256): 
+    for k0 in range(256):
         a_0 = a_i(c[0, index_0], k0, f[0, index_0])
         for k1 in range(256):
             a_1 = a_i(c[0, index_1], k1, f[0, index_1])
-            if a_0 != a_1: # if a byte pair doesnt satisfy the equation we skip this k1
+            if a_0 != a_1:  # if a byte pair doesnt satisfy the equation we skip this k1
                 continue
             # now we can check with the second faulty pair
             a_0_second = a_i(c[1, index_0], k0, f[1, index_0])
@@ -143,11 +148,13 @@ def solve_column(c, f, sol, index_0, index_1, index_2, index_3):
                 a_2_second = a_i(c[1, index_2], k2, f[1, index_2])
                 if (a_2 != gfmul256(a_0, 2)) or (a_2_second != gfmul256(a_0_second, 2)):
                     continue
-                # now for the equation which contains the * 3 
+                # now for the equation which contains the * 3
                 for k3 in range(256):
                     a_3 = a_i(c[0, index_3], k3, f[0, index_3])
                     a_3_second = a_i(c[1, index_3], k3, f[1, index_3])
-                    if (a_3 != gfmul256(a_0, 3)) or (a_3_second != gfmul256(a_0_second, 3)):
+                    if (a_3 != gfmul256(a_0, 3)) or (
+                        a_3_second != gfmul256(a_0_second, 3)
+                    ):
                         continue
                     # seems like these hypotheses passed all the continues so we can save them
                     # hopefully they are the only ones
@@ -156,11 +163,12 @@ def solve_column(c, f, sol, index_0, index_1, index_2, index_3):
                     sol[index_2].append(k2)
                     sol[index_3].append(k3)
 
+
 def a_i(c_i, k, f_i):
     """
     calculates 'a' with SR applied for a byte 'k'
     c_i: cipher text byte i
     k: key byte i
-    f_i: faulty cipher text byte i 
+    f_i: faulty cipher text byte i
     """
-    return (invSubBytes(c_i ^ k) ^ invSubBytes(f_i ^ k))
+    return invSubBytes(c_i ^ k) ^ invSubBytes(f_i ^ k)
