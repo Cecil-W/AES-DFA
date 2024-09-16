@@ -2,7 +2,7 @@
 
 Part of the lecture "Sichere Implementierung kryptographischer Verfahren" WS 2022/23
 
-Implementation of a differential fault attack (DFA) on AES
+Implementation of a differential fault analysis attack (DFA) on AES
 
 ## Files
 
